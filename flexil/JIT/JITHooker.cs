@@ -1,4 +1,5 @@
-﻿using System;
+﻿using flexil.JIT.Attributes;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -17,18 +18,11 @@ namespace flexil.JIT {
     private CompileMethodDelegate _originalCompileMethod;
     private CompileMethodDelegate _replacedCompileMethod;
 
-    private MethodInfo[] targetMethods;
-
     public JITHooker() {
       IsHooked = false;
     }
 
     public bool Hook() {
-      var methods = AppDomain.CurrentDomain.GetAssemblies()
-        .SelectMany(a => a.GetTypes().SelectMany(b => b.GetMethods().Where(t => t.IsDefined(typeof(HookHereAttribute), false))));
-
-
-
       foreach (ProcessModule module in Process.GetCurrentProcess().Modules) {
         if (Path.GetFileName(module.FileName) == "clrjit.dll") {
           var jitAddr = GetProcAddress(module.BaseAddress, "getJit");
@@ -115,9 +109,10 @@ namespace flexil.JIT {
       // https://github.com/xoofx/ManagedJit/blob/master/ManagedJit/ManagedJit.cs
       var res = _originalCompileMethod(thisPtr, comp, ref info, flags, out nativeEntry, out nativeSizeOfCode);
 
-      if (i++ != 0) {
+      if (i != 0) {
         return res;
-			}
+      }
+      i++;
 
       var vtableCorJitInfo = Marshal.ReadIntPtr(comp);
 
@@ -162,17 +157,15 @@ namespace flexil.JIT {
           HandleMethodCompile(method, info.ILCode, info.ILCodeSize, nativeEntry, nativeSizeOfCode);
         }
 			}
-
+      i--;
       return res;
     }
 
     private void HandleMethodCompile(MethodBase method, IntPtr ilCodePtr, int ilSize, IntPtr nativeCodePtr, int nativeCodeSize) {
-      if (method.Name == "Answer") {
-        var codes = new byte[nativeCodeSize];
-        // Marshal.Copy(nativeCodePtr, codes, 0, nativeCodeSize);
-        // Console.WriteLine(BitConverter.ToString(codes));
-        Marshal.WriteByte(nativeCodePtr, 0x25, 2);
-      }
+      var attrs = method.GetCustomAttributes<HookAttribute>(true);
+      foreach (var attr in attrs) {
+        attr.PostProcess(ilCodePtr, ilSize, nativeCodePtr, nativeCodeSize);
+			}
     }
   }
 }
