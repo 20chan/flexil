@@ -2,6 +2,8 @@
 
 .net core JIT native code AOT
 
+[blog post (KR)](https://blog.0chan.dev/2022-03-06-Dot-Net-Core-Custom-JIT/)
+
 ## examples
 
 ```csharp
